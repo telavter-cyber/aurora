@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Aurora Dashboard</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width:100%; height:100%; overflow:hidden;
+    background:#070A14;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color:#E8ECF4;
+  }
+  #bg {
+    position:fixed; inset:0;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(80,220,180,0.25), transparent 45%),
+      radial-gradient(circle at 85% 15%, rgba(90,120,255,0.22), transparent 50%),
+      radial-gradient(circle at 50% 90%, rgba(180,90,255,0.15), transparent 55%),
+      #070A14;
+    z-index:0;
+  }
+  #grid {
+    position:relative; z-index:1;
+    width:100%; height:100%;
+    display:grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 2fr 1fr;
+    padding:48px;
+  }
+  .panel {
+    background: rgba(10,14,28,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 20px 26px;
+    backdrop-filter: blur(6px);
+  }
+  #weather { grid-column:1; grid-row:1; align-self:start; }
+  #netstats { grid-column:3; grid-row:1; align-self:start; justify-self:end; text-align:right; }
+  #clockwrap { grid-column:1/4; grid-row:2; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  #clock {
+    font-size: 8vw; font-weight:200; letter-spacing:4px;
+    text-shadow: 0 0 30px rgba(100,220,255,0.35);
+  }
+  #date { font-size:1.6vw; opacity:0.7; margin-top:8px; text-transform:capitalize; }
+  #nyclock { grid-column:3; grid-row:3; align-self:end; justify-self:end; text-align:right; }
+  .label { font-size:0.9vw; opacity:0.55; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; }
+  .value { font-size:1.8vw; font-weight:600; }
+  .small { font-size:1vw; opacity:0.8; margin-top:4px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+  #weatherIcon { font-size:3vw; margin-right:10px; vertical-align:middle; }
+</style>
+</head>
+<body>
+  <div id="bg"></div>
+  <div id="grid">
+    <div class="panel" id="weather">
+      <div class="label">Meteo &middot; Dijon</div>
+      <div class="value"><span id="weatherIcon">--</span><span id="weatherTemp">--&deg;C</span></div>
+      <div class="small" id="weatherDesc">Chargement...</div>
+    </div>
+
+    <div class="panel" id="netstats">
+      <div class="label">Reseau</div>
+      <div class="value"><span class="dot" id="netDot" style="background:#777"></span><span id="netType">--</span></div>
+      <div class="small" id="netSpeed">--</div>
+    </div>
+
+    <div id="clockwrap">
+      <div id="clock">--:--:--</div>
+      <div id="date">--</div>
+    </div>
+
+    <div class="panel" id="nyclock">
+      <div class="label">New York</div>
+      <div class="value" id="nyTime">--:--</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Horloge locale (Dijon / Europe/Paris)
+  var days = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+  var months = ["janvier","fevrier","mars","avril","mai","juin","juillet","aout","septembre","octobre","novembre","decembre"];
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  function updateClocks() {
+    var now = new Date();
+    try {
+      var local = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+      document.getElementById("clock").textContent =
+        pad(local.getHours()) + ":" + pad(local.getMinutes()) + ":" + pad(local.getSeconds());
+      document.getElementById("date").textContent =
+        days[local.getDay()] + " " + local.getDate() + " " + months[local.getMonth()];
+    } catch (e) {
+      document.getElementById("clock").textContent =
+        pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+    }
+
+    try {
+      var ny = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      document.getElementById("nyTime").textContent = pad(ny.getHours()) + ":" + pad(ny.getMinutes());
+    } catch (e) {
+      document.getElementById("nyTime").textContent = "--:--";
+    }
+  }
+  setInterval(updateClocks, 1000);
+  updateClocks();
+
+  // Meteo Dijon via Open-Meteo (gratuit, sans cle)
+  var weatherCodes = {
+    0: ["Ciel degage", "01"], 1: ["Peu nuageux", "02"], 2: ["Partiellement nuageux", "03"],
+    3: ["Couvert", "04"], 45: ["Brouillard", "50"], 48: ["Brouillard givrant", "50"],
+    51: ["Bruine faible", "09"], 53: ["Bruine", "09"], 55: ["Bruine forte", "09"],
+    61: ["Pluie faible", "10"], 63: ["Pluie", "10"], 65: ["Pluie forte", "10"],
+    71: ["Neige faible", "13"], 73: ["Neige", "13"], 75: ["Neige forte", "13"],
+    80: ["Averses", "09"], 81: ["Averses", "09"], 82: ["Averses fortes", "09"],
+    95: ["Orage", "11"], 96: ["Orage + grele", "11"], 99: ["Orage violent", "11"]
+  };
+  var weatherEmoji = {
+    "01": "\u2600", "02": "\uD83C\uDF24", "03": "\u26C5", "04": "\u2601",
+    "50": "\uD83C\uDF2B", "09": "\uD83C\uDF27", "10": "\uD83C\uDF27",
+    "13": "\u2744", "11": "\u26C8"
+  };
+
+  function fetchWeather() {
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=47.3220&longitude=5.0415&current_weather=true";
+    fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+      var cw = data && data.current_weather;
+      if (!cw) return;
+      var info = weatherCodes[cw.weathercode] || ["Variable", "03"];
+      document.getElementById("weatherTemp").textContent = Math.round(cw.temperature) + "\u00b0C";
+      document.getElementById("weatherDesc").textContent = info[0] + " \u00b7 vent " + Math.round(cw.windspeed) + " km/h";
+      document.getElementById("weatherIcon").textContent = weatherEmoji[info[1]] || "\u26C5";
+    }).catch(function () {
+      document.getElementById("weatherDesc").textContent = "Indisponible";
+    });
+  }
+  fetchWeather();
+  setInterval(fetchWeather, 10 * 60 * 1000);
+
+  // Stats reseau (NetworkInformation API si dispo sur le navigateur Tizen)
+  function colorForEffectiveType(t) {
+    if (t === "4g") return "#4ADE80";
+    if (t === "3g") return "#FBBF24";
+    if (t === "2g" || t === "slow-2g") return "#F87171";
+    return "#60A5FA";
+  }
+
+  function updateNet() {
+    var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+      var type = (conn.effectiveType || conn.type || "inconnu").toUpperCase();
+      document.getElementById("netType").textContent = type;
+      document.getElementById("netDot").style.background = colorForEffectiveType(conn.effectiveType);
+      var parts = [];
+      if (conn.downlink) parts.push(conn.downlink + " Mb/s");
+      if (conn.rtt) parts.push(conn.rtt + " ms");
+      document.getElementById("netSpeed").textContent = parts.join(" \u00b7 ") || "--";
+    } else {
+      document.getElementById("netType").textContent = navigator.onLine ? "EN LIGNE" : "HORS LIGNE";
+      document.getElementById("netDot").style.background = navigator.onLine ? "#4ADE80" : "#F87171";
+      document.getElementById("netSpeed").textContent = "API indisponible";
+    }
+  }
+  updateNet();
+  setInterval(updateNet, 5000);
+  window.addEventListener("online", updateNet);
+  window.addEventListener("offline", updateNet);
+
+  // Retour au launcher avec la touche Back / Retour TV
+  document.addEventListener("keydown", function (e) {
+    if (e.keyCode === 10009 || e.key === "Back") {
+      try { tizen.application.getCurrentApplication().exit(); } catch (err) {}
+    }
+  });
+})();
+</script>
+</body>
+</html>

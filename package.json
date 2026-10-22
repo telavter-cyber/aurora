@@ -1,0 +1,9 @@
+{
+  "name": "tizenbrew-aurora-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard aurora (horloge, meteo Dijon, horloge NY, stats reseau) pour TizenBrew, inspire du theme CleanYourTV",
+  "packageType": "app",
+  "appName": "Aurora Dashboard",
+  "appPath": "app/index.html",
+  "evaluateScriptOnDocumentStart": false
+}
